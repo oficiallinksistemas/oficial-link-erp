@@ -1,8 +1,8 @@
-CREATE TABLE schema_migrations (
+CREATE TABLE IF NOT EXISTS schema_migrations (
     id         TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   name        TEXT    NOT NULL,
   trade_name  TEXT,
@@ -15,7 +15,7 @@ CREATE TABLE companies (
   updated_at  TEXT
 , plan TEXT NOT NULL DEFAULT 'standard', subscription_status TEXT NOT NULL DEFAULT 'active'
   CHECK (subscription_status IN ('active', 'past_due', 'canceled')));
-CREATE TABLE stores (
+CREATE TABLE IF NOT EXISTS stores (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE stores (
   updated_at  TEXT,
   UNIQUE (company_id, code)
 );
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER REFERENCES companies(id) ON DELETE CASCADE,  -- NULL = global
   slug        TEXT    NOT NULL,
@@ -36,17 +36,17 @@ CREATE TABLE roles (
   is_system   INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE permissions (
+CREATE TABLE IF NOT EXISTS permissions (
   code        TEXT PRIMARY KEY,
   module      TEXT NOT NULL,
   description TEXT
 );
-CREATE TABLE role_permissions (
+CREATE TABLE IF NOT EXISTS role_permissions (
   role_id          INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
   permission_code  TEXT    NOT NULL REFERENCES permissions(code) ON DELETE CASCADE,
   PRIMARY KEY (role_id, permission_code)
 );
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id    INTEGER REFERENCES companies(id) ON DELETE CASCADE,  -- NULL = Master
   store_id      INTEGER REFERENCES stores(id) ON DELETE SET NULL,
@@ -59,7 +59,7 @@ CREATE TABLE users (
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT
 , must_change_password INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   token_hash  TEXT    NOT NULL UNIQUE,
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -69,7 +69,7 @@ CREATE TABLE sessions (
   expires_at  TEXT    NOT NULL,
   revoked_at  TEXT
 );
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER,                    -- NULL = ação de plataforma (Master)
   user_id     INTEGER,
@@ -81,19 +81,19 @@ CREATE TABLE audit_logs (
   user_agent  TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE platform_settings (
+CREATE TABLE IF NOT EXISTS platform_settings (
   key        TEXT PRIMARY KEY,
   value      TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE modules (
+CREATE TABLE IF NOT EXISTS modules (
   slug        TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
   description TEXT,
   is_official INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE company_modules (
+CREATE TABLE IF NOT EXISTS company_modules (
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   module_slug TEXT NOT NULL REFERENCES modules(slug) ON DELETE CASCADE,
   status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
@@ -102,7 +102,7 @@ CREATE TABLE company_modules (
   updated_at  TEXT,
   PRIMARY KEY (company_id, module_slug)
 );
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
@@ -112,7 +112,7 @@ CREATE TABLE customers (
   updated_at  TEXT
 , email       TEXT, address     TEXT, number      TEXT, complement  TEXT, district    TEXT, city        TEXT, state       TEXT, zip         TEXT, notes       TEXT, status      TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'inactive')));
-CREATE TABLE sales (
+CREATE TABLE IF NOT EXISTS sales (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id      INTEGER NOT NULL REFERENCES stores(id),
@@ -130,7 +130,7 @@ CREATE TABLE sales (
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT
 , product_id INTEGER REFERENCES products(id) ON DELETE SET NULL, product_name TEXT, product_price_cents INTEGER, stock_was_applied INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE targets (
+CREATE TABLE IF NOT EXISTS targets (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id   INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   type         TEXT    NOT NULL CHECK (type IN ('seller', 'store')),
@@ -148,7 +148,7 @@ CREATE TABLE targets (
     (type = 'store'  AND store_id IS NOT NULL AND user_id IS NULL)
   )
 );
-CREATE TABLE product_categories (
+CREATE TABLE IF NOT EXISTS product_categories (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
@@ -157,7 +157,7 @@ CREATE TABLE product_categories (
   updated_at  TEXT,
   UNIQUE (company_id, name)
 );
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id     INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   category_id    INTEGER REFERENCES product_categories(id) ON DELETE SET NULL,
@@ -173,7 +173,7 @@ CREATE TABLE products (
   created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT
 );
-CREATE TABLE sale_items (
+CREATE TABLE IF NOT EXISTS sale_items (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   sale_id          INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
@@ -186,7 +186,7 @@ CREATE TABLE sale_items (
   subtotal_cents   INTEGER NOT NULL CHECK (subtotal_cents > 0),
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE stock_balances (
+CREATE TABLE IF NOT EXISTS stock_balances (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id    INTEGER NOT NULL REFERENCES stores(id),
@@ -196,7 +196,7 @@ CREATE TABLE stock_balances (
   updated_at  TEXT,
   UNIQUE (company_id, store_id, product_id)
 );
-CREATE TABLE suppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name        TEXT    NOT NULL,
@@ -212,7 +212,7 @@ CREATE TABLE suppliers (
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT
 );
-CREATE TABLE purchases (
+CREATE TABLE IF NOT EXISTS purchases (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id      INTEGER NOT NULL REFERENCES stores(id),
@@ -229,7 +229,7 @@ CREATE TABLE purchases (
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT
 );
-CREATE TABLE purchase_items (
+CREATE TABLE IF NOT EXISTS purchase_items (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   purchase_id      INTEGER NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
@@ -242,7 +242,7 @@ CREATE TABLE purchase_items (
   subtotal_cents   INTEGER NOT NULL CHECK (subtotal_cents > 0),
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE stock_transfers (
+CREATE TABLE IF NOT EXISTS stock_transfers (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   from_store_id INTEGER NOT NULL REFERENCES stores(id),
@@ -257,7 +257,7 @@ CREATE TABLE stock_transfers (
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT
 );
-CREATE TABLE stock_transfer_items (
+CREATE TABLE IF NOT EXISTS stock_transfer_items (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   transfer_id   INTEGER NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
@@ -267,7 +267,7 @@ CREATE TABLE stock_transfer_items (
   quantity      INTEGER NOT NULL CHECK (quantity > 0),
   created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE inventory_sessions (
+CREATE TABLE IF NOT EXISTS inventory_sessions (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id   INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id     INTEGER NOT NULL REFERENCES stores(id),
@@ -278,7 +278,7 @@ CREATE TABLE inventory_sessions (
   created_by   INTEGER NOT NULL REFERENCES users(id),
   note         TEXT
 );
-CREATE TABLE inventory_items (
+CREATE TABLE IF NOT EXISTS inventory_items (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   session_id         INTEGER NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
   company_id         INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -290,7 +290,7 @@ CREATE TABLE inventory_items (
   created_at         TEXT NOT NULL DEFAULT (datetime('now')), counted_at TEXT, counted_movement_id INTEGER NOT NULL DEFAULT 0,
   UNIQUE (session_id, product_id)
 );
-CREATE TABLE "stock_movements" (
+CREATE TABLE IF NOT EXISTS "stock_movements" (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id     INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id       INTEGER NOT NULL REFERENCES stores(id),
@@ -305,7 +305,7 @@ CREATE TABLE "stock_movements" (
   note           TEXT,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE accounts_payable (
+CREATE TABLE IF NOT EXISTS accounts_payable (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id         INTEGER REFERENCES stores(id),
@@ -328,7 +328,7 @@ CREATE TABLE accounts_payable (
   created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT
 );
-CREATE TABLE accounts_receivable (
+CREATE TABLE IF NOT EXISTS accounts_receivable (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id           INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   store_id             INTEGER REFERENCES stores(id),
@@ -350,13 +350,13 @@ CREATE TABLE accounts_receivable (
   created_at           TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT
 );
-CREATE TABLE company_assets (
+CREATE TABLE IF NOT EXISTS company_assets (
   company_id  INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
   mime        TEXT    NOT NULL CHECK (mime IN ('image/png', 'image/jpeg')),
   data        BLOB    NOT NULL,
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE saas_billing_config (
+CREATE TABLE IF NOT EXISTS saas_billing_config (
   company_id              INTEGER PRIMARY KEY REFERENCES companies(id),
   implementation_fee_cents INTEGER NOT NULL DEFAULT 0 CHECK (implementation_fee_cents >= 0),
   monthly_fee_cents       INTEGER NOT NULL DEFAULT 0 CHECK (monthly_fee_cents >= 0),
@@ -368,7 +368,7 @@ CREATE TABLE saas_billing_config (
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE saas_charges (
+CREATE TABLE IF NOT EXISTS saas_charges (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id      INTEGER NOT NULL REFERENCES companies(id),
   type            TEXT NOT NULL CHECK (type IN ('implementation','monthly','custom')),
@@ -389,7 +389,7 @@ CREATE TABLE saas_charges (
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE saas_receipts (
+CREATE TABLE IF NOT EXISTS saas_receipts (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   payment_id  INTEGER NOT NULL UNIQUE,      -- 1:1 com saas_payments (integridade na transação)
   company_id  INTEGER NOT NULL REFERENCES companies(id),
@@ -398,7 +398,7 @@ CREATE TABLE saas_receipts (
   data        BLOB NOT NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE saas_payments (
+CREATE TABLE IF NOT EXISTS saas_payments (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   charge_id     INTEGER NOT NULL REFERENCES saas_charges(id),
   company_id    INTEGER NOT NULL REFERENCES companies(id),
@@ -410,7 +410,7 @@ CREATE TABLE saas_payments (
   created_by    INTEGER NOT NULL REFERENCES users(id),
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id           INTEGER NOT NULL REFERENCES companies(id),
   store_id             INTEGER REFERENCES stores(id),
@@ -436,7 +436,7 @@ CREATE TABLE tasks (
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE agenda_events (
+CREATE TABLE IF NOT EXISTS agenda_events (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id           INTEGER NOT NULL REFERENCES companies(id),
   store_id             INTEGER REFERENCES stores(id),
@@ -457,7 +457,7 @@ CREATE TABLE agenda_events (
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE checklists (
+CREATE TABLE IF NOT EXISTS checklists (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id           INTEGER NOT NULL REFERENCES companies(id),
   store_id             INTEGER REFERENCES stores(id),
@@ -476,7 +476,7 @@ CREATE TABLE checklists (
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE checklist_items (
+CREATE TABLE IF NOT EXISTS checklist_items (
   id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   checklist_id         INTEGER NOT NULL REFERENCES checklists(id) ON DELETE CASCADE,
   title                TEXT NOT NULL,
@@ -487,7 +487,7 @@ CREATE TABLE checklist_items (
   completed_at         TEXT,
   completed_by_user_id INTEGER REFERENCES users(id)
 );
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id  INTEGER NOT NULL REFERENCES companies(id),
   user_id     INTEGER NOT NULL REFERENCES users(id),
@@ -506,90 +506,90 @@ CREATE TABLE notifications (
   read_at     TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE UNIQUE INDEX ux_companies_document ON companies(document) WHERE document IS NOT NULL;
-CREATE INDEX ix_stores_company ON stores(company_id);
-CREATE INDEX ix_users_company ON users(company_id);
-CREATE INDEX ix_sessions_user ON sessions(user_id);
-CREATE INDEX ix_audit_company ON audit_logs(company_id, created_at);
-CREATE INDEX ix_audit_created ON audit_logs(created_at);
-CREATE INDEX ix_company_modules_company ON company_modules(company_id);
-CREATE INDEX ix_customers_company ON customers(company_id, name);
-CREATE INDEX ix_sales_company_date    ON sales(company_id, sold_at);
-CREATE INDEX ix_sales_company_store   ON sales(company_id, store_id, sold_at);
-CREATE INDEX ix_sales_company_seller  ON sales(company_id, seller_id, sold_at);
-CREATE INDEX ix_sales_company_status  ON sales(company_id, status, sold_at);
-CREATE UNIQUE INDEX ux_targets_seller_period
+CREATE UNIQUE INDEX IF NOT EXISTS ux_companies_document ON companies(document) WHERE document IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_stores_company ON stores(company_id);
+CREATE INDEX IF NOT EXISTS ix_users_company ON users(company_id);
+CREATE INDEX IF NOT EXISTS ix_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS ix_audit_company ON audit_logs(company_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_audit_created ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS ix_company_modules_company ON company_modules(company_id);
+CREATE INDEX IF NOT EXISTS ix_customers_company ON customers(company_id, name);
+CREATE INDEX IF NOT EXISTS ix_sales_company_date    ON sales(company_id, sold_at);
+CREATE INDEX IF NOT EXISTS ix_sales_company_store   ON sales(company_id, store_id, sold_at);
+CREATE INDEX IF NOT EXISTS ix_sales_company_seller  ON sales(company_id, seller_id, sold_at);
+CREATE INDEX IF NOT EXISTS ix_sales_company_status  ON sales(company_id, status, sold_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_targets_seller_period
   ON targets(company_id, user_id, start_date, end_date) WHERE type = 'seller';
-CREATE UNIQUE INDEX ux_targets_store_period
+CREATE UNIQUE INDEX IF NOT EXISTS ux_targets_store_period
   ON targets(company_id, store_id, start_date, end_date) WHERE type = 'store';
-CREATE INDEX ix_targets_company_period ON targets(company_id, start_date, end_date);
-CREATE UNIQUE INDEX ux_customers_document
+CREATE INDEX IF NOT EXISTS ix_targets_company_period ON targets(company_id, start_date, end_date);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_customers_document
   ON customers(company_id, document) WHERE document IS NOT NULL;
-CREATE INDEX ix_customers_company_name
+CREATE INDEX IF NOT EXISTS ix_customers_company_name
   ON customers(company_id, name);
-CREATE INDEX ix_sales_company_customer
+CREATE INDEX IF NOT EXISTS ix_sales_company_customer
   ON sales(company_id, customer_id);
-CREATE INDEX ix_product_categories_company ON product_categories(company_id, status);
-CREATE UNIQUE INDEX ux_products_sku
+CREATE INDEX IF NOT EXISTS ix_product_categories_company ON product_categories(company_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_products_sku
   ON products(company_id, sku) WHERE sku IS NOT NULL;
-CREATE UNIQUE INDEX ux_products_barcode
+CREATE UNIQUE INDEX IF NOT EXISTS ux_products_barcode
   ON products(company_id, barcode) WHERE barcode IS NOT NULL;
-CREATE INDEX ix_products_company_name ON products(company_id, name);
-CREATE INDEX ix_products_company_category ON products(company_id, category_id);
-CREATE INDEX ix_sales_company_product ON sales(company_id, product_id);
-CREATE INDEX ix_sale_items_sale ON sale_items(sale_id);
-CREATE INDEX ix_sale_items_company_product ON sale_items(company_id, product_id);
-CREATE INDEX ix_stock_balances_company_store ON stock_balances(company_id, store_id);
-CREATE UNIQUE INDEX ux_suppliers_document
+CREATE INDEX IF NOT EXISTS ix_products_company_name ON products(company_id, name);
+CREATE INDEX IF NOT EXISTS ix_products_company_category ON products(company_id, category_id);
+CREATE INDEX IF NOT EXISTS ix_sales_company_product ON sales(company_id, product_id);
+CREATE INDEX IF NOT EXISTS ix_sale_items_sale ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS ix_sale_items_company_product ON sale_items(company_id, product_id);
+CREATE INDEX IF NOT EXISTS ix_stock_balances_company_store ON stock_balances(company_id, store_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_suppliers_document
   ON suppliers(company_id, document) WHERE document IS NOT NULL;
-CREATE INDEX ix_suppliers_company_name ON suppliers(company_id, name);
-CREATE INDEX ix_purchases_company_date ON purchases(company_id, purchase_date);
-CREATE INDEX ix_purchases_company_store ON purchases(company_id, store_id, purchase_date);
-CREATE INDEX ix_purchase_items_purchase ON purchase_items(purchase_id);
-CREATE INDEX ix_purchase_items_company_product ON purchase_items(company_id, product_id);
-CREATE INDEX ix_stock_transfers_company ON stock_transfers(company_id, created_at);
-CREATE INDEX ix_stock_transfer_items_transfer ON stock_transfer_items(transfer_id);
-CREATE INDEX ix_inventory_sessions_company ON inventory_sessions(company_id, store_id);
-CREATE INDEX ix_inventory_items_session ON inventory_items(session_id);
-CREATE INDEX ix_stock_movements_lookup ON stock_movements(company_id, store_id, product_id, created_at);
-CREATE INDEX ix_stock_movements_company_created ON stock_movements(company_id, created_at);
-CREATE UNIQUE INDEX ux_accounts_payable_purchase
+CREATE INDEX IF NOT EXISTS ix_suppliers_company_name ON suppliers(company_id, name);
+CREATE INDEX IF NOT EXISTS ix_purchases_company_date ON purchases(company_id, purchase_date);
+CREATE INDEX IF NOT EXISTS ix_purchases_company_store ON purchases(company_id, store_id, purchase_date);
+CREATE INDEX IF NOT EXISTS ix_purchase_items_purchase ON purchase_items(purchase_id);
+CREATE INDEX IF NOT EXISTS ix_purchase_items_company_product ON purchase_items(company_id, product_id);
+CREATE INDEX IF NOT EXISTS ix_stock_transfers_company ON stock_transfers(company_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_stock_transfer_items_transfer ON stock_transfer_items(transfer_id);
+CREATE INDEX IF NOT EXISTS ix_inventory_sessions_company ON inventory_sessions(company_id, store_id);
+CREATE INDEX IF NOT EXISTS ix_inventory_items_session ON inventory_items(session_id);
+CREATE INDEX IF NOT EXISTS ix_stock_movements_lookup ON stock_movements(company_id, store_id, product_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_stock_movements_company_created ON stock_movements(company_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_payable_purchase
   ON accounts_payable(company_id, purchase_id) WHERE purchase_id IS NOT NULL;
-CREATE INDEX ix_payables_company_status ON accounts_payable(company_id, status);
-CREATE INDEX ix_payables_company_due    ON accounts_payable(company_id, due_date);
-CREATE INDEX ix_payables_company_supplier ON accounts_payable(company_id, supplier_id);
-CREATE INDEX ix_payables_company_store  ON accounts_payable(company_id, store_id);
-CREATE INDEX ix_payables_company_purchase ON accounts_payable(company_id, purchase_id);
-CREATE UNIQUE INDEX ux_accounts_receivable_sale
+CREATE INDEX IF NOT EXISTS ix_payables_company_status ON accounts_payable(company_id, status);
+CREATE INDEX IF NOT EXISTS ix_payables_company_due    ON accounts_payable(company_id, due_date);
+CREATE INDEX IF NOT EXISTS ix_payables_company_supplier ON accounts_payable(company_id, supplier_id);
+CREATE INDEX IF NOT EXISTS ix_payables_company_store  ON accounts_payable(company_id, store_id);
+CREATE INDEX IF NOT EXISTS ix_payables_company_purchase ON accounts_payable(company_id, purchase_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_receivable_sale
   ON accounts_receivable(company_id, sale_id) WHERE sale_id IS NOT NULL;
-CREATE INDEX ix_receivables_company_status  ON accounts_receivable(company_id, status);
-CREATE INDEX ix_receivables_company_due     ON accounts_receivable(company_id, due_date);
-CREATE INDEX ix_receivables_company_issue   ON accounts_receivable(company_id, issue_date);
-CREATE INDEX ix_receivables_company_customer ON accounts_receivable(company_id, customer_id);
-CREATE INDEX ix_receivables_company_store   ON accounts_receivable(company_id, store_id);
-CREATE INDEX ix_receivables_received_at     ON accounts_receivable(company_id, received_at);
-CREATE INDEX ix_saas_config_due_day ON saas_billing_config (billing_due_day);
-CREATE INDEX ix_saas_charges_company_status ON saas_charges (company_id, status);
-CREATE INDEX ix_saas_charges_status_due    ON saas_charges (status, due_date);
-CREATE INDEX ix_saas_charges_company_due   ON saas_charges (company_id, due_date);
-CREATE INDEX ix_saas_charges_paid_on       ON saas_charges (paid_on) WHERE paid_on IS NOT NULL;
-CREATE INDEX ix_saas_payments_company ON saas_payments (company_id);
-CREATE INDEX ix_saas_payments_charge  ON saas_payments (charge_id);
-CREATE INDEX ix_saas_payments_paid_on ON saas_payments (paid_on);
-CREATE INDEX ix_saas_receipts_company ON saas_receipts (company_id);
-CREATE INDEX ix_tasks_company_status  ON tasks (company_id, status);
-CREATE INDEX ix_tasks_company_due     ON tasks (company_id, due_date);
-CREATE INDEX ix_tasks_assignee_status ON tasks (assigned_to_user_id, status);
-CREATE INDEX ix_tasks_company_store   ON tasks (company_id, store_id);
-CREATE INDEX ix_agenda_company_start ON agenda_events (company_id, start_at);
-CREATE INDEX ix_agenda_company_status ON agenda_events (company_id, status);
-CREATE INDEX ix_agenda_responsible   ON agenda_events (responsible_user_id, status);
-CREATE INDEX ix_checklists_company_status ON checklists (company_id, status);
-CREATE INDEX ix_checklists_assignee      ON checklists (assigned_to_user_id, status);
-CREATE INDEX ix_checklist_items_order    ON checklist_items (checklist_id, position);
-CREATE INDEX ix_checklist_items_open     ON checklist_items (checklist_id, completed);
-CREATE UNIQUE INDEX ux_notifications_dedupe
+CREATE INDEX IF NOT EXISTS ix_receivables_company_status  ON accounts_receivable(company_id, status);
+CREATE INDEX IF NOT EXISTS ix_receivables_company_due     ON accounts_receivable(company_id, due_date);
+CREATE INDEX IF NOT EXISTS ix_receivables_company_issue   ON accounts_receivable(company_id, issue_date);
+CREATE INDEX IF NOT EXISTS ix_receivables_company_customer ON accounts_receivable(company_id, customer_id);
+CREATE INDEX IF NOT EXISTS ix_receivables_company_store   ON accounts_receivable(company_id, store_id);
+CREATE INDEX IF NOT EXISTS ix_receivables_received_at     ON accounts_receivable(company_id, received_at);
+CREATE INDEX IF NOT EXISTS ix_saas_config_due_day ON saas_billing_config (billing_due_day);
+CREATE INDEX IF NOT EXISTS ix_saas_charges_company_status ON saas_charges (company_id, status);
+CREATE INDEX IF NOT EXISTS ix_saas_charges_status_due    ON saas_charges (status, due_date);
+CREATE INDEX IF NOT EXISTS ix_saas_charges_company_due   ON saas_charges (company_id, due_date);
+CREATE INDEX IF NOT EXISTS ix_saas_charges_paid_on       ON saas_charges (paid_on) WHERE paid_on IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_saas_payments_company ON saas_payments (company_id);
+CREATE INDEX IF NOT EXISTS ix_saas_payments_charge  ON saas_payments (charge_id);
+CREATE INDEX IF NOT EXISTS ix_saas_payments_paid_on ON saas_payments (paid_on);
+CREATE INDEX IF NOT EXISTS ix_saas_receipts_company ON saas_receipts (company_id);
+CREATE INDEX IF NOT EXISTS ix_tasks_company_status  ON tasks (company_id, status);
+CREATE INDEX IF NOT EXISTS ix_tasks_company_due     ON tasks (company_id, due_date);
+CREATE INDEX IF NOT EXISTS ix_tasks_assignee_status ON tasks (assigned_to_user_id, status);
+CREATE INDEX IF NOT EXISTS ix_tasks_company_store   ON tasks (company_id, store_id);
+CREATE INDEX IF NOT EXISTS ix_agenda_company_start ON agenda_events (company_id, start_at);
+CREATE INDEX IF NOT EXISTS ix_agenda_company_status ON agenda_events (company_id, status);
+CREATE INDEX IF NOT EXISTS ix_agenda_responsible   ON agenda_events (responsible_user_id, status);
+CREATE INDEX IF NOT EXISTS ix_checklists_company_status ON checklists (company_id, status);
+CREATE INDEX IF NOT EXISTS ix_checklists_assignee      ON checklists (assigned_to_user_id, status);
+CREATE INDEX IF NOT EXISTS ix_checklist_items_order    ON checklist_items (checklist_id, position);
+CREATE INDEX IF NOT EXISTS ix_checklist_items_open     ON checklist_items (checklist_id, completed);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_notifications_dedupe
   ON notifications (company_id, user_id, dedupe_key);
-CREATE INDEX ix_notifications_user_unread ON notifications (user_id, read_at);
-CREATE INDEX ix_notifications_user_recent ON notifications (user_id, id DESC);
-CREATE INDEX ix_notifications_company      ON notifications (company_id);
+CREATE INDEX IF NOT EXISTS ix_notifications_user_unread ON notifications (user_id, read_at);
+CREATE INDEX IF NOT EXISTS ix_notifications_user_recent ON notifications (user_id, id DESC);
+CREATE INDEX IF NOT EXISTS ix_notifications_company      ON notifications (company_id);
