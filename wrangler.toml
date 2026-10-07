@@ -13,7 +13,7 @@ run_worker_first = ["/api/*"]
 binding = "DB"
 database_name = "oficial-link-erp"
 migrations_dir = "d1/migrations"
-database_id = "bf2a8e44-6d57-49f5-b0b5-3860a9bb0e78"
+database_id = "1b352475-1671-4fe6-93be-137633af5b72"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
