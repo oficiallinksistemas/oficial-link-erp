@@ -1,0 +1,138 @@
+================================================================================
+RELATÓRIO DE MIGRAÇÃO CLOUDFLARE — FASE 1 (ASYNC-IFICAÇÃO VALIDADA)
+OFICIAL LINK ERP — base V3.5.0 → árvore de trabalho "cloudflare-fase1"
+Data: 2026-10-07
+================================================================================
+
+1. OBJETIVO DA FASE 1
+--------------------------------------------------------------------------------
+Converter o ERP V3.5.0 (código 100% síncrono sobre better-sqlite3) para uma
+API 100% assíncrona, estruturalmente pronta para o backend Cloudflare D1,
+VALIDANDO a transformação pelos 258 testes originais ainda rodando sobre o
+SQLite clássico. Princípio: await sobre valor síncrono é semanticamente
+inócuo — logo a conversão mecânica é verificável pela suíte existente antes
+de qualquer contato com o D1.
+
+2. ACEITE — RESULTADO
+--------------------------------------------------------------------------------
+# pass 258   # fail 0   (suíte completa, node --test, SQLite temporário)
+node --check: 0 erros de sintaxe em todos os arquivos de src/
+
+3. MÉTODO
+--------------------------------------------------------------------------------
+a) Auditoria real do ZIP (166 arquivos): inventário de better-sqlite3 (411
+   db.prepare, 298 get, 160 run, 84 all, 31 transaction), fs/path/process
+   (5 arquivos), Buffer (3), uploads base64+BLOB (2 tabelas), migrations SQL
+   (26, sem PRAGMA/ATTACH/trigger/view), node:crypto scrypt (compatível com
+   Workers via nodejs_compat — verificado na doc oficial da Cloudflare).
+b) Baseline: 258/258 verdes na V3.5.0 original (comprovado neste ambiente).
+c) Codemod próprio (codemod_async.py): conversão sync→async em 12 rodadas
+   até ponto fixo — inserção de await em cadeias db.prepare().{get,all,run},
+   statement-vars e db.exec; propagação de await entre funções locais e
+   imports (incl. destructuring); async-ificação de funções que passaram a
+   conter await; PRESERVAÇÃO dos corpos db.transaction() (skip intencional).
+d) Conversão manual (uma a uma) das transações cujos corpos chamavam helpers
+   async — padrão guard-first + await sequencial.
+e) Cada regressão encontrada pela suíte virou correção de causa-raiz no
+   codemod ou no código, nunca ajuste de teste para encaixar (exceção: os
+   próprios arquivos de teste precisaram acompanhar a nova assinatura async
+   de businessToday/businessMonthStart/notify — harness, não comportamento).
+
+4. BUGS ENCONTRADOS E CORRIGIDOS (10 classes, todos evidenciados por falhas
+   de teste ou por verificação programática)
+--------------------------------------------------------------------------------
+B1  Arrows anônimas em posição de argumento (router.get(..., (req,res)=>{}))
+    nunca eram registradas como nós → async não inserido → await inválido.
+B2  Callbacks de transição com arrow de EXPRESSÃO ÚNICA (sem chaves)
+    escapavam do skip de corpos db.transaction.
+B3  Arrow cujo corpo COMEÇA no await (body_start == pos do await) não era
+    reconhecido como enclosing node (comparação estrita).
+B4  Imports desestruturados const { f } = require(...) eram tratados como
+    var.método → ~22 awaits de propagação perdidos (businessToday etc.).
+B5  Template literals: código dentro de ${...} era marcado como string →
+    awaits invisíveis (businessMonthStart escapou da propagação).
+B6  Factory sync (manualRoute) virou async indevidamente → Route.post()
+    recebeu Promise → crash em lote (28 arquivos em cascata, 1 causa).
+B7  Arrows nomeadas const f = (...) => nunca recebiam nome no detector →
+    callers de helpers locais (ex.: const one = async (sql,...p)=>...) sem
+    await → payload de resposta virava {}.
+B8  Inline-requires require('../x/service').fn(...) não rastreados pelo
+    pipeline (só const = require era) → dashboard sem dados/gating.
+B9  Precedência: await fn(...).prop = await(fn(...).prop) → .id/.c sobre
+    Promise = undefined (role de usuário; 75 ocorrências de .get/.run/.all
+    corrigidas com parênteses; varredura residual sem achados reais).
+B10 async duplicado (async async function) em create/receive ao aplicar
+    correções sobre funções já async.
+
+Infra da sandbox (não do projeto): filesystem read-only intermitente
+(vencido com gravação via tmp + os.replace) e limite de 120s por chamada
+(vencido com suíte em background + polling do log).
+
+5. TRANSAÇÕES (31 sites no total) — DISPOSIÇÃO FINAL
+--------------------------------------------------------------------------------
+PERMANECEM SYNC (14, corpos com apenas statements diretos — verificação
+automática por varredura de chamadas a helpers async):
+  checklists/service.js:93,199 · company/routes.js:101 · notifications/
+  service.js:108 (markRead) · payables/service.js:206 · billing/service.js:
+  82,207,232,282 · purchases/service.js:94,121 · receivables/service.js:241
+  · transfers/service.js:74 · tasks/service.js:217 · (boot clássico:
+  migrations.js, seed.js — fora do escopo do Worker)
+
+CONVERTIDAS (17) — padrão guard-first (UPDATE condicional com verificação
+de changes p/ idempotência em retry + pré-cheque all-or-nothing onde o
+estorno pode falhar):
+  stock/service.js entry/exit/adjust · notifications/service.js 4 geradores
+  (hoist de businessToday) · billing/service.js refreshOverdue (hoist) ·
+  inventory.service.js count(UPSERT idempotente)/finalize · sales/service.js
+  create(INSERT+itens+baixa) e cancel(UPDATE guarda + SALE_REVERSAL) ·
+  purchases/service.js receive(UPDATE guarda+estoque+título) e cancel
+  (pré-cheque de viabilidade do estorno + UPDATE guarda + título) ·
+  transfers.service.js complete(UPDATE guarda + par de movimentações)
+
+Notas de integridade:
+- SALE_REVERSAL é ENTRADA — cancelamento de venda não tem pré-cheque de
+  saldo (mesma semântica da transação original).
+- Cancelamento de COMPRA é SAÍDA — pré-cheque de saldo ANTES de qualquer
+  escrita restaura o all-or-nothing (CANCEL-ROLLBACK).
+- Janela de crash de processo entre escritas sequenciais: aceita na Fase 1,
+  FECHADA pelo batch atômico do D1 na Fase 2 (adapter.batch já implementado
+  e atômico no modo clássico via better-sqlite3 transaction).
+
+6. DIVERGÊNCIAS RELATÓRIO V3.5.0 × CÓDIGO REAL (confirmadas nesta auditoria)
+--------------------------------------------------------------------------------
+D1  backup.js mantém rotação PLANA dos 10 arquivos mais recentes — não
+    diário×7/semanal×4/mensal×6 como declarado no relatório de homologação.
+D2  Relatório citava "15 ocorrências de datetime('now') auditadas" — o código
+    real tem 121 (80 JS + 41 SQL). UTC por design (D1 também é UTC — reaudit
+    por uso na Fase 2).
+
+7. ARQUITETURA RESULTANTE
+--------------------------------------------------------------------------------
+server/src/database/adapter.js  — API async isomórfica:
+  prepare(sql) → { get/all/run } async (run → { changes, lastInsertRowid })
+  exec(sql) · batch([{sql,params},...]) ATÔMICO (modo clássico: better-
+  sqlite3 transaction; Fase 2: env.DB.batch() do D1, 1:1)
+Módulos de negócio: 100% async, zero mocks, sem fallback silencioso.
+Frontend (web/): INALTERADO. Rotas/middlewares/RBAC/module gating: preservados.
+
+8. O QUE A FASE 1 NÃO É (escopo da FASE 2)
+--------------------------------------------------------------------------------
+- Backend real D1 (binding env.DB) — adapter hoje executa sobre better-sqlite3.
+- BLOBs em R2 (logo/comprovantes continuam como BLOB no SQLite).
+- Rate limit em KV (continua em memória — trocar antes do go-live distribuído).
+- express.static/sendFile → Workers Static Assets (app.js ainda serve web/).
+- Config via .env → vars/secrets do Wrangler; boot sem migrations/seed.
+- Suíte portada para @cloudflare/vitest-pool-workers (Miniflare D1 local).
+- Backup/restore D1 (wrangler d1 export + Cron → R2) com restore exercitado.
+- Deploy real, HTTPS, APP_ORIGIN de produção.
+
+9. RECOMENDAÇÃO
+--------------------------------------------------------------------------------
+FASE 1 APROVADA como ponte comprovada. Próximo bloco: FASE 2 — trocar o
+backend do adapter para D1 (via wrangler dev local), converter os uploads
+para R2, rate limit para KV, subir wrangler.toml e portar a suíte, mantendo
+o mesmo aceite: 258/258 (mais testes novos de batch/R2/KV).
+
+================================================================================
+FIM DO RELATÓRIO — FASE 1
+================================================================================

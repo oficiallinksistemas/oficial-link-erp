@@ -1,0 +1,19 @@
+{
+  "name": "oficial-link-erp-server",
+  "version": "3.5.0",
+  "private": true,
+  "description": "Oficial Link ERP - API (Oficial Link Sistemas)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node src/database/seed.js",
+    "backup": "node scripts/backup.js",
+    "test": "node --test tests/"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2"
+  }
+}

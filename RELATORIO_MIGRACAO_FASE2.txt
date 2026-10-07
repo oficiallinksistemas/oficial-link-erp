@@ -1,0 +1,108 @@
+================================================================================
+RELATÓRIO DE MIGRAÇÃO CLOUDFLARE — FASE 2 (BACKEND D1 + WORKER)
+OFICIAL LINK ERP — V3.5.0 → arquitetura Cloudflare Workers + D1
+Data: 2026-10-07
+================================================================================
+
+1. RESUMO DO QUE FOI ENTREGUE
+--------------------------------------------------------------------------------
+- Adapter de banco DUAL (server/src/database/adapter.js):
+  · modo D1: env.DB via d1-binding.mjs (cloudflare:workers), prepare/get/all/
+    run assíncronos, batch() atômico nativo, meta.changes/meta.last_row_id,
+    undefined→null nos binds.
+  · modo clássico: better-sqlite3 sync-exact (await sobre valor não-thenable
+    é transparente — migrations, seed, scripts e testes com leitura direta
+    funcionam inalterados).
+- connection.js = shim que re-exporta o adapter → TODOS os módulos de
+  negócio falam com o D1 sem nenhuma alteração de call site.
+- db.js: better-sqlite3 carregado via eval('require') — invisível ao bundler
+  do Wrangler (addon nativo não pode entrar no bundle; o Worker nunca
+  executa esse caminho).
+- worker.js (ES Module): Express oficial via cloudflare:node
+  httpServerHandler (padrão oficial, compatibility_date >= 2025-08-15).
+  app.js (CJS, inalterado da V3.5.0) integrado via interop de bundler.
+- wrangler.toml: Static Assets servindo web/ (SPA fallback,
+  run_worker_first=["/api/*"]), binding D1, vars de ambiente,
+  nodejs_compat + nodejs_compat_populate_process_env.
+- Guards de runtime Workers: config sem fs, rate limit sem setInterval
+  (limpeza preguiçosa por request).
+- d1/snapshot.sql: bootstrap completo (schema das 26 migrations + seed:
+  módulos, empresas, usuários com hash scrypt, permissões, lojas).
+- scripts/smoke-d1.sh: smoke de 3 passos para máquina real (health, login
+  master = scrypt no workerd, /api/modules = adapter D1 ponta a ponta).
+- pay/receive (payables/receivables): tx desnecessária removida — UPDATE
+  condicional único (idempotência por changes===0 mantida).
+
+2. VERIFICAÇÕES EXECUTADAS (evidência)
+--------------------------------------------------------------------------------
+✔ Suíte clássica completa com o adapter dual no lugar: 258/258 (zero
+  regressão da emenda connection→adapter).
+✔ Build do Worker pelo Wrangler 4: COMPILOU com nodejs_compat,
+  cloudflare:node, cloudflare:workers e interop CJS→ESM. O Wrangler chegou
+  ao estágio "Your Worker has access to the following bindings" listando
+  env.DB (D1 local), env.ASSETS e todas as vars — configuração validada.
+✔ Snapshot.sql gerado por boot clássico real (39 tabelas) — schema auditado
+  como compatível com D1 desde a Fase 1 (sem PRAGMA/ATTACH/trigger/view).
+✗ Smoke D1 em runtime NÃO executado NESTE ambiente: a sandbox nega unix
+  sockets ao runtime do workerd/Miniflare (write EPIPE em Runtime.update
+  Config) e flipa arquivos para read-only (tmp do wrangler). Limite do
+  ambiente de auditoria, não do projeto. Em qualquer máquina normal:
+    npm install
+    node node_modules/wrangler/bin/wrangler.js d1 execute oficial-link-erp \
+      --local --file=d1/snapshot.sql
+    node node_modules/wrangler/bin/wrangler.js dev --port 8787 &
+    ./scripts/smoke-d1.sh
+  (3 comandos + smoke; smoke de homologação completo segue o mapa H1–H6.)
+
+3. DECISÕES REGISTRADAS
+--------------------------------------------------------------------------------
+- BLOBs (logo/comprovantes) permanecem como BLOB no D1 (limite 1 MB/row,
+  coerente com os limites atuais de upload). R2 = upgrade path documentado
+  se houver necessidade de arquivos maiores (metadados em D1 + bytes em R2).
+- Migrations/seed são etapas de deploy (wrangler d1 migrations apply /
+  wrangler d1 execute), NUNCA runtime do Worker (gate adapter.isD1()).
+- database_id no wrangler.toml é placeholder local; produção exige
+  `wrangler d1 create oficial-link-erp` e substituição do ID.
+
+4. PENDÊNCIAS DA FASE 2 (fila objetiva, em ordem)
+--------------------------------------------------------------------------------
+P1  CONCLUÍDA — zero db.transaction fora do adapter e do boot clássico.
+    14 conversões: notifications 5 · billing 5 · transfers 1 · checklists 2
+    · tasks 1 · company 1 · purchases 2. Padrão canônico aplicado:
+    statement único → await direto (atômico); múltiplos writes →
+    guard-first + db.batch() atômico (checklists create, transfers create,
+    purchases create/update, refreshOverdue). Aceite: suíte 258/258.
+    Causa-raiz de um cluster de 4 falhas: package.json raiz com
+    "type":"commonjs" (artefato do npm init para o wrangler) quebrava o
+    import() ESM do receivablePayload.js — removido; lição registrada:
+    deps do wrangler vivem em subdiretório próprio, nunca na raiz.
+P2  Executar o smoke D1 em máquina real (scripts/smoke-d1.sh) + homologação
+    H1–H6 adaptada contra o D1 local.
+P3  CONCLUÍDA — rate limiter dual (core/rateLimit.js + core/kv-binding.mjs):
+    Workers usam binding KV env.RATE_LIMIT (janela fixa, TTL nativo,
+    consistente entre isolates); Node clássico mantém memória com semântica
+    idêntica. Fail-open documentado (KV indisponível libera + log —
+    disponibilidade > bloqueio momentâneo). auth/routes.js aguarda
+    isBlocked/clear/hit. Aceite: suíte 258/258. wrangler.toml tem o
+    binding com IDs placeholder (`wrangler kv namespace create`).
+P4  Produção: wrangler d1 create (região próxima ao Brasil), secret put das
+    senhas de seed, database_id real, deploy + domínio www.oficiallink.com.
+P5  PARCIAL — scripts/backup-d1.sh implementado (export -> arquivo local +
+    opcional R2 + retenção) e procedimento de restore documentado no
+    próprio script. PENDENTE: exercitar o restore uma vez (requer conta
+    Cloudflare autenticada; ver condições do go-live).
+P6  Porte da suíte para @cloudflare/vitest-pool-workers (aceite permanece
+    258/258 no clássico; testes D1 nativos entram como incremento).
+
+5. ESTADO GERAL DA MIGRAÇÃO
+--------------------------------------------------------------------------------
+Arquitetura Cloudflare Workers + D1 + Static Assets: IMPLEMENTADA, build
+validado e 100% do código de negócio convertido para batch()/await (D1-exercitável). Funcionalidade de negócio: preservada por construção (mesmo
+código V3.5.0, mesmos 258 testes verdes, zero reescrita de rota/regra).
+Risco residual principal: comportamentos do D1 só observáveis em runtime
+real (P2) — mitigação: smoke objetivo + homologação adaptada antes de
+qualquer deploy, e V3.5.0 clássica intacta como fallback.
+
+================================================================================
+FIM DO RELATÓRIO — FASE 2
+================================================================================
