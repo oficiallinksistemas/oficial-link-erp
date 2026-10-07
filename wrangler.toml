@@ -3,41 +3,26 @@ main = "server/src/worker.js"
 compatibility_date = "2026-10-07"
 compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 
-# ---------------------------------------------------------------------------
-# Frontend estático: web/ servido pelos Static Assets do Workers (zero mudança
-# no frontend). SPA fallback para rotas internas. Somente /api/* executa o
-# Worker (run_worker_first) — todo o resto é servido direto pelos assets.
-# ---------------------------------------------------------------------------
 [assets]
 directory = "./web"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
-# ---------------------------------------------------------------------------
-# Banco: Cloudflare D1 (SQLite serverless). database_id é gerado com
-# `wrangler d1 create oficial-link-erp` — o placeholder abaixo serve para
-# desenvolvimento local (`wrangler dev` usa D1 emulado, sem ID real).
-# ---------------------------------------------------------------------------
 [[d1_databases]]
 binding = "DB"
 database_name = "oficial-link-erp"
 migrations_dir = "d1/migrations"
-database_id = "bf2a8e44-6d57-49f5-b0b5-3860a9bb0e78" # <- substituir pelo ID real
+database_id = "bf2a8e44-6d57-49f5-b0b5-3860a9bb0e78"
 
-# ---------------------------------------------------------------------------
-# Variáveis de ambiente (não-secretas). Secrets via `wrangler secret put`:
-#   SEED_MASTER_PASSWORD, SEED_ANJOS_PASSWORD (somente para o bootstrap inicial)
-# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "be0baa4668df41f4ac38ba383a280c6f"
+preview_id = "be0baa4668df41f4ac38ba383a280c6f"
+
 [vars]
 NODE_ENV = "production"
-APP_ORIGIN = "https://www.sistema.oficiallink.com"
+APP_ORIGIN = "https://oficial-link-erp.workers.dev"
 SECURE_COOKIES = "1"
 SESSION_TTL_HOURS = "8"
-TRUST_PROXY = "1"   # Cloudflare é o proxy confiável (req.ip real do visitante)
-
-# [placement] — D1 é single-region por banco; para latência BR, colocar perto
-# dos usuários quando criar o banco em produção (ex.: region = "weur" ou a
-# região escolhida no painel). Descomente após `wrangler d1 create`.
-# [placement]
-# mode = "smart"
+TRUST_PROXY = "1"
