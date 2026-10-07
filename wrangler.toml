@@ -23,7 +23,7 @@ run_worker_first = ["/api/*"]
 binding = "DB"
 database_name = "oficial-link-erp"
 migrations_dir = "d1/migrations"
-database_id = "00000000-0000-0000-0000-000000000000" # <- substituir pelo ID real
+database_id = "bf2a8e44-6d57-49f5-b0b5-3860a9bb0e78" # <- substituir pelo ID real
 
 # ---------------------------------------------------------------------------
 # Variáveis de ambiente (não-secretas). Secrets via `wrangler secret put`:
@@ -31,7 +31,7 @@ database_id = "00000000-0000-0000-0000-000000000000" # <- substituir pelo ID rea
 # ---------------------------------------------------------------------------
 [vars]
 NODE_ENV = "production"
-APP_ORIGIN = "https://www.oficiallink.com"
+APP_ORIGIN = "https://www.sistema.oficiallink.com"
 SECURE_COOKIES = "1"
 SESSION_TTL_HOURS = "8"
 TRUST_PROXY = "1"   # Cloudflare é o proxy confiável (req.ip real do visitante)
