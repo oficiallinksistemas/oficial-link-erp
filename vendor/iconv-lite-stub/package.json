@@ -1,0 +1,6 @@
+{
+  "name": "iconv-lite",
+  "version": "0.4.24",
+  "description": "Stub UTF-8 para Workers (Cloudflare)",
+  "main": "index.js"
+}
