@@ -1,0 +1,35 @@
+============================================================
+LEIA PRIMEIRO — SUBINDO O ERP (versao corrigida e validada)
+============================================================
+ESTE ZIP ja foi testado de ponta a ponta (build com a versao
+exata do Cloudflare). Esta TUDO no lugar certo:
+  [ok] package.json na raiz (Cloudflare instala o express sozinho)
+  [ok] server/src/worker.js (o arquivo que faltava nas tentativas)
+  [ok] d1/migrations com as 2 migrations blindadas
+  [ok] wrangler.toml JA com seu ID do banco e ID da memoria
+
+PASSO A PASSO (GitHub Desktop):
+1. GitHub Desktop -> menu Repository -> Remove...
+   (NAO marque a caixinha de "mover para a lixeira")
+2. File -> Clone repository -> oficial-link-erp
+   -> pasta NOVA: Documentos\erp-final -> Clone
+3. Abra a pasta extraida DESTE zip -> Ctrl+A -> Ctrl+C
+4. Cole dentro de Documentos\erp-final -> confirme substituicoes
+5. ATENCAO: se existir uma pasta "tests" na RAIZ de erp-final,
+   APAGUE essa pasta (a certa fica dentro de server\tests)
+6. Confira: erp-final\server\src\worker.js EXISTE? Tem que existir.
+7. GitHub Desktop -> Summary: "versao final" -> Commit to main
+   -> Push origin
+8. No Cloudflare (Workers & Pages -> oficial-link-erp ->
+   Deployments) assista o build. Deve aparecer:
+   "Installing dependencies" -> 2 migrations com [ok]
+   -> "Deployment complete!" + um endereco https://...
+9. COPIE ESSE ENDERECO. Abra o wrangler.toml da pasta erp-final,
+   troque PENDENTE-RODADA-2 pelo endereco (entre aspas),
+   Salve -> Commit -> Push origin -> espere 1 minuto
+10. Abra o endereco no navegador -> login:
+    master@oficiallink.com.br / Master@2026
+
+Deu erro em alguma etapa? Pare e me mande as ultimas linhas
+do log do build. Nao tente improvisar.
+============================================================

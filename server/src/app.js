@@ -18,6 +18,11 @@ if (!adapter.isD1()) {
   require('./database/migrations').runMigrations();
 }
 const { seedIfEmpty } = require('./database/seed');
+// Seed só roda no modo clássico (Node). No Worker o banco é populado por
+// migrations no deploy (d1/migrations/0002_seed.sql).
+if (!adapter.isD1()) {
+  seedIfEmpty();
+}
 const { parseCookies } = require('./core/http');
 const { createRateLimiter } = require('./core/rateLimit');
 const { csrfOriginProtection } = require('./core/csrf');
@@ -31,8 +36,6 @@ const storeRoutes = require('./modules/stores/routes');
 const userRoutes = require('./modules/users/routes');
 const roleRoutes = require('./modules/roles/routes');
 const dashboardRoutes = require('./modules/dashboard/routes');
-
-seedIfEmpty();
 
 const app = express();
 app.disable('x-powered-by');

@@ -22,7 +22,7 @@ preview_id = "be0baa4668df41f4ac38ba383a280c6f"
 
 [vars]
 NODE_ENV = "production"
-APP_ORIGIN = "https://oficial-link-erp.workers.dev"
+APP_ORIGIN = "PENDENTE-RODADA-2"
 SECURE_COOKIES = "1"
 SESSION_TTL_HOURS = "8"
 TRUST_PROXY = "1"
