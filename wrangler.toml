@@ -17,8 +17,8 @@ database_id = "1b352475-1671-4fe6-93be-137633af5b72"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
-id = "be0baa4668df41f4ac38ba383a280c6f"
-preview_id = "be0baa4668df41f4ac38ba383a280c6f"
+id = "e37945e0b16141cd8a2d12ed8c4a43fa"
+preview_id = "e37945e0b16141cd8a2d12ed8c4a43fa"
 
 [vars]
 NODE_ENV = "production"
